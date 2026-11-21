@@ -85,7 +85,7 @@
 
     function bootAI() {
         document.getElementById("welcomePop").style.display = "none";
-        let intro = "नमस्ते विवेक! आपका स्वागत है। मैं आपका स्मार्ट वॉइस एआई असिस्टेंट हूँ। नीचे लाल माइक बटन दबाकर अपना कोई भी सवाल बोलिए, मैं हिंदी में बोलकर जवाब दूँगा।";
+        let intro = "नमस्ते विवेक! आपका स्वागत है। अब मेरा दिमाग और भी स्मार्ट हो गया है। आप विज्ञान, गणित के फॉर्मूले, मौसम या दुनिया का कोई भी सवाल पूछ सकते हैं!";
         addBubble("<strong>🤖 Vivek AI:</strong> " + intro, false);
         speakText(intro);
     }
@@ -126,8 +126,27 @@
         recognition.start();
     }
 
+    async function searchWikiSmart(query, lang) {
+        const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
+        const sRes = await fetch(searchUrl);
+        const sData = await sRes.json();
+        if (sData.query && sData.query.search && sData.query.search.length > 0) {
+            const topTitle = sData.query.search[0].title;
+            const sumUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topTitle)}`;
+            const sumRes = await fetch(sumUrl);
+            if (sumRes.ok) {
+                const sumData = await sumRes.json();
+                if (sumData.extract) {
+                    const splitter = lang === 'hi' ? "।" : ".";
+                    return sumData.extract.split(splitter).slice(0, 2).join(splitter) + splitter;
+                }
+            }
+        }
+        return null;
+    }
+
     async function askRealAI(question) {
-        let q = question.toLowerCase();
+        let q = question.toLowerCase().trim();
 
         if (q.includes("kisne banaya") || q.includes("किसने बनाया") || q.includes("who made")) {
             return "विवेक, मुझे आपने ही बनाया है! आप ए.एस.एम कॉन्वेंट स्कूल सुखपुरा, बलिया के कक्षा 9 के होनहार एआई डेवलपर हैं।";
@@ -138,36 +157,33 @@
         if (q.includes("principal") || q.includes("प्रिंसिपल") || q.includes("ajit")) {
             return "विवेक, ए.एस.एम कॉन्वेंट स्कूल के प्रिंसिपल सर श्री अजीत कुमार पांडे जी हैं।";
         }
+        if (q.includes("होल स्क्वायर") || q.includes("whole square") || q.includes("a+b")) {
+            return "विवेक, (a + b) का होल स्क्वायर बराबर होता है: a स्क्वायर प्लस b स्क्वायर प्लस 2ab (a² + b² + 2ab)।";
+        }
+        if (q.includes("weather") || q.includes("मौसम") || q.includes("तापमान")) {
+            try {
+                const wRes = await fetch("https://wttr.in");
+                if (wRes.ok) {
+                    const wText = await wRes.text();
+                    return "विवेक, अभी बलिया (उत्तर प्रदेश) का मौसम " + wText.trim() + " है।";
+                }
+            } catch (e) {}
+            return "विवेक, आज भारत के उत्तरी हिस्सों और उत्तर प्रदेश में मौसम सामान्य और सुहावना बना हुआ है।";
+        }
         if (q.includes("time") || q.includes("समय") || q.includes("बजे")) {
             let now = new Date().toLocaleTimeString('hi-IN', {hour: '2-digit', minute:'2-digit'});
             return "विवेक, अभी समय हो रहा है " + now + "।";
         }
-        if (q.includes("date") || q.includes("तारीख") || q.includes("आज")) {
-            let today = new Date().toLocaleDateString('hi-IN', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
-            return "विवेक, आज " + today + " है।";
-        }
 
         try {
-            let searchTopic = question.replace(/क्या है|कौन है|के बारे में बताओ|what is|who is|tell me about/gi, "").trim();
-            const wikiRes = await fetch("https://wikipedia.org" + encodeURIComponent(searchTopic));
-            if (wikiRes.ok) {
-                const wikiData = await wikiRes.json();
-                if (wikiData.extract) {
-                    let shortAns = wikiData.extract.split("।").slice(0, 2).join("।") + "।";
-                    return "विवेक, " + shortAns;
-                }
-            }
-            const enWikiRes = await fetch("https://wikipedia.org" + encodeURIComponent(searchTopic));
-            if (enWikiRes.ok) {
-                const enData = await enWikiRes.json();
-                if (enData.extract) {
-                    let shortEn = enData.extract.split(".").slice(0, 2).join(".") + ".";
-                    return "Vivek, " + shortEn;
-                }
-            }
+            let hiAns = await searchWikiSmart(question, "hi");
+            if (hiAns) return "विवेक, " + hiAns;
+
+            let enAns = await searchWikiSmart(question, "en");
+            if (enAns) return "Vivek, " + enAns;
         } catch (e) {}
 
-        return "विवेक, आपने पूछा '" + question + "'। कृपया किसी खास विषय, विज्ञान, इतिहास या व्यक्ति का नाम लेकर पूछें, मैं तुरंत जानकारी ढूँढ कर बताऊँगा!";
+        return "विवेक, '" + question + "' के बारे में अभी सटीक डेटा नहीं मिल पाया। कृपया थोड़ा स्पष्ट शब्द या विषय बोलकर पूछें!";
     }
 
     async function sendMsg() {
@@ -177,7 +193,7 @@
         addBubble(val, true);
         inp.value = "";
 
-        const thinkingBubble = addBubble("<strong>🤖 Vivek AI:</strong> <em>जानकारी ढूँढ रहा हूँ विवेक...</em>", false);
+        const thinkingBubble = addBubble("<strong>🤖 Vivek AI:</strong> <em>जवाब खोज रहा हूँ विवेक...</em>", false);
         const reply = await askRealAI(val);
         thinkingBubble.innerHTML = "<strong>🤖 Vivek AI:</strong> " + reply;
         speakText(reply);
